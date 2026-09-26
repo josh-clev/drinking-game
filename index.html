@@ -160,7 +160,6 @@
     .horse-2 { --horse-color: #56a8ff; }
     .horse-3 { --horse-color: #f3ce4a; }
     .horse-4 { --horse-color: #69d17d; }
-    .horse-5 { --horse-color: #bb7cff; }
 
     .horse-number {
       fill: #10151c;
@@ -265,8 +264,9 @@
 
     .result-overlay .winner-number {
       margin: 8px 0 16px;
-      font-size: clamp(92px, 24vw, 180px);
-      line-height: .9;
+      font-size: clamp(56px, 15vw, 112px);
+      line-height: 1;
+      white-space: nowrap;
       text-shadow: 0 8px 28px rgba(0,0,0,.35);
     }
 
@@ -403,7 +403,7 @@
   <main class="game" id="game">
     <div class="rotate-note">Rotate your phone sideways for the intended layout.</div>
 
-    <section class="track" id="track" aria-label="Five horse race track">
+    <section class="track" id="track" aria-label="Four horse race track">
       <div class="finish-line" aria-hidden="true"></div>
       <div class="finish-label" aria-hidden="true">FINISH</div>
 
@@ -459,24 +459,12 @@
         </div>
       </div>
 
-      <div class="lane">
-        <div class="number">5</div>
-        <div class="horse horse-5" data-horse="5" aria-label="Horse 5">
-          <svg viewBox="0 0 92 52" role="img" aria-hidden="true">
-            <path fill="currentColor" d="M18 18C25 10 40 8 55 12c8 2 13 7 16 13l8-2c4-1 8 2 8 6 0 4-3 6-7 6h-8l-6 5-2 10h-5l-1-12-10 2-6 10h-5l2-13-15-3-4 8h-5l3-12c-3-4-4-8-2-12l-8-7 2-3 11 5z"/>
-            <path d="M19 17L6 9" stroke="currentColor" stroke-width="4" stroke-linecap="round"/>
-            <circle cx="78" cy="27" r="1.8" fill="#111"/>
-            <circle cx="45" cy="24" r="9" fill="#fff" opacity=".92"/>
-            <text x="45" y="24" class="horse-number">5</text>
-          </svg>
-        </div>
-      </div>
     </section>
 
     <aside class="side">
       <div>
         <h1 class="title">Horse Race</h1>
-        <p class="subtitle">Higher numbers have better odds. The winner is locked in the instant the race begins.</p>
+        <p class="subtitle">Pick a horse. Two finishers are safe; the others drink their number.</p>
       </div>
 
       <div class="status" aria-live="polite">
@@ -487,7 +475,7 @@
 
       <div>
         <button class="race-btn" id="raceBtn" type="button">RACE</button>
-        <div class="probability-note">Odds weights: 1 : 2 : 3 : 4 : 5</div>
+        <div class="probability-note">Each horse averages 0.96 drinks per race</div>
       </div>
     </aside>
   </main>
@@ -496,9 +484,9 @@
     <div class="result-card">
       <div class="result-content">
         <h2 class="result-title" id="resultTitle">Race Result</h2>
-        <div class="winner-label">Winner</div>
+        <div class="winner-label">Safe horses</div>
         <div class="winner-number" id="winnerNumber">–</div>
-        <div class="losers">Lost: <span id="loserNumbers">–</span></div>
+        <div class="losers">Drink: <span id="loserNumbers">–</span></div>
       </div>
       <button class="close-result-btn" id="closeResultBtn" type="button">CLOSE</button>
     </div>
@@ -521,21 +509,29 @@
       var winnerNumber = document.getElementById("winnerNumber");
       var loserNumbers = document.getElementById("loserNumbers");
 
-      var progress = [0, 0, 0, 0, 0];
+      var progress = [0, 0, 0, 0];
       var running = false;
       var timers = [];
       var countdownTimer = null;
 
-      function weightedWinner() {
-        var total = 15;
-        var roll = Math.random() * total;
-        var cumulative = 0;
-
-        for (var i = 1; i <= 5; i++) {
-          cumulative += i;
-          if (roll < cumulative) return i;
+      // Draw one pair before the animation. The 100 tickets produce safe
+      // chances of 4%, 52%, 68%, 76% for horses 1–4 respectively.
+      // Thus (1 - chance of safety) × horse number = 0.96 for each.
+      function chooseSafePair() {
+        var pairs = [
+          { horses: [1, 2], tickets: 2 },
+          { horses: [1, 3], tickets: 1 },
+          { horses: [1, 4], tickets: 1 },
+          { horses: [2, 3], tickets: 21 },
+          { horses: [2, 4], tickets: 29 },
+          { horses: [3, 4], tickets: 46 }
+        ];
+        var roll = Math.floor(Math.random() * 100);
+        for (var i = 0; i < pairs.length; i++) {
+          if (roll < pairs[i].tickets) return pairs[i].horses;
+          roll -= pairs[i].tickets;
         }
-        return 5;
+        return pairs[pairs.length - 1].horses;
       }
 
       function clearTimers() {
@@ -580,7 +576,7 @@
         return 0.5 + Math.random() * 1.35;
       }
 
-      function makeTrajectory(targetPct, horseNumber, winner) {
+      function makeTrajectory(targetPct, horseNumber, safeNumbers) {
         var weights = [];
         var i;
 
@@ -588,14 +584,14 @@
           var w = randomWeight();
 
           // Give every horse at least one noticeable burst and one slower phase.
-          if (i === (horseNumber + winner) % SEGMENTS) w *= 1.55;
-          if (i === (horseNumber * 2 + winner) % SEGMENTS) w *= 0.62;
+          if (i === (horseNumber + safeNumbers[0]) % SEGMENTS) w *= 1.55;
+          if (i === (horseNumber * 2 + safeNumbers[1]) % SEGMENTS) w *= 0.62;
 
           weights.push(w);
         }
 
-        // Keep the true winner's last segment strong enough to guarantee a clear finish.
-        if (horseNumber === winner) {
+        // Give both safe horses a final burst before they cross together.
+        if (safeNumbers.indexOf(horseNumber) !== -1) {
           weights[SEGMENTS - 1] *= 1.28;
         }
 
@@ -612,18 +608,18 @@
         return points;
       }
 
-      function buildRace(winner) {
+      function buildRace(safeNumbers) {
         var trajectories = [];
 
-        for (var n = 1; n <= 5; n++) {
+        for (var n = 1; n <= 4; n++) {
           var target;
-          if (n === winner) {
+          if (safeNumbers.indexOf(n) !== -1) {
             target = 100;
           } else {
             // Everyone else finishes close enough to keep the end visually competitive.
             target = 93.8 + Math.random() * 4.1;
           }
-          trajectories.push(makeTrajectory(target, n, winner));
+          trajectories.push(makeTrajectory(target, n, safeNumbers));
         }
 
         return trajectories;
@@ -636,8 +632,8 @@
         clearTimers();
         resetHorses();
 
-        var winner = weightedWinner();
-        var trajectories = buildRace(winner);
+        var safeNumbers = chooseSafePair();
+        var trajectories = buildRace(safeNumbers);
         var startTime = performance.now();
 
         raceBtn.disabled = true;
@@ -651,7 +647,7 @@
           horse.classList.add("running");
         });
 
-        // Start each movement segment. The winning horse was already selected above.
+        // Start each movement segment. Both safe horses were already selected above.
         for (var segment = 0; segment < SEGMENTS; segment++) {
           (function (s) {
             var id = setTimeout(function () {
@@ -680,9 +676,9 @@
             horse.classList.remove("running");
           });
 
-          var losers = [1, 2, 3, 4, 5].filter(function (n) { return n !== winner; });
-          winnerNumber.textContent = String(winner);
-          loserNumbers.textContent = losers.join(", ");
+          var losers = [1, 2, 3, 4].filter(function (n) { return safeNumbers.indexOf(n) === -1; });
+          winnerNumber.textContent = safeNumbers.join(" + ");
+          loserNumbers.textContent = losers.map(function (n) { return n + " → " + n; }).join(" · ");
           resultOverlay.classList.add("show");
           closeResultBtn.focus();
 
