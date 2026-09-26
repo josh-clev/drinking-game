@@ -215,7 +215,86 @@
       width: 100%;
     }
 
-    .result.show { display: block; }
+    .result-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 1000;
+      display: none;
+      min-height: 100dvh;
+      padding:
+        max(24px, env(safe-area-inset-top))
+        max(24px, env(safe-area-inset-right))
+        max(18px, env(safe-area-inset-bottom))
+        max(24px, env(safe-area-inset-left));
+      background: rgba(10, 14, 20, .98);
+      align-items: center;
+      justify-content: center;
+    }
+
+    .result-overlay.show {
+      display: flex;
+    }
+
+    .result-card {
+      width: min(100%, 520px);
+      min-height: calc(100dvh - 48px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .result-content {
+      margin: auto 0;
+    }
+
+    .result-title {
+      margin: 0 0 12px;
+      font-size: clamp(24px, 6vw, 44px);
+      font-weight: 1000;
+      letter-spacing: .06em;
+      text-transform: uppercase;
+      color: var(--text);
+    }
+
+    .result-overlay .winner-label {
+      font-size: clamp(13px, 2.4vw, 18px);
+      letter-spacing: 2px;
+    }
+
+    .result-overlay .winner-number {
+      margin: 8px 0 16px;
+      font-size: clamp(92px, 24vw, 180px);
+      line-height: .9;
+      text-shadow: 0 8px 28px rgba(0,0,0,.35);
+    }
+
+    .result-overlay .losers {
+      font-size: clamp(16px, 3.5vw, 24px);
+      color: var(--muted);
+    }
+
+    .close-result-btn {
+      appearance: none;
+      border: 0;
+      border-radius: 14px;
+      width: min(100%, 420px);
+      min-height: 56px;
+      margin-top: auto;
+      padding: 0 20px;
+      background: var(--accent);
+      color: #161616;
+      font-size: 18px;
+      font-weight: 1000;
+      cursor: pointer;
+      box-shadow: 0 4px 0 #b9942e;
+    }
+
+    .close-result-btn:active {
+      transform: translateY(3px);
+      box-shadow: 0 1px 0 #b9942e;
+    }
 
     .winner-label {
       font-size: 11px;
@@ -403,11 +482,7 @@
       <div class="status" aria-live="polite">
         <div class="ready" id="readyText">Ready to race</div>
         <div class="countdown" id="countdown">10.0</div>
-        <div class="result" id="result">
-          <div class="winner-label">Winner</div>
-          <div class="winner-number" id="winnerNumber">–</div>
-          <div class="losers">Lost: <span id="loserNumbers">–</span></div>
-        </div>
+
       </div>
 
       <div>
@@ -416,6 +491,18 @@
       </div>
     </aside>
   </main>
+
+  <section class="result-overlay" id="resultOverlay" role="dialog" aria-modal="true" aria-labelledby="resultTitle">
+    <div class="result-card">
+      <div class="result-content">
+        <h2 class="result-title" id="resultTitle">Race Result</h2>
+        <div class="winner-label">Winner</div>
+        <div class="winner-number" id="winnerNumber">–</div>
+        <div class="losers">Lost: <span id="loserNumbers">–</span></div>
+      </div>
+      <button class="close-result-btn" id="closeResultBtn" type="button">CLOSE</button>
+    </div>
+  </section>
 
   <script>
     (function () {
@@ -429,7 +516,8 @@
       var raceBtn = document.getElementById("raceBtn");
       var readyText = document.getElementById("readyText");
       var countdown = document.getElementById("countdown");
-      var result = document.getElementById("result");
+      var resultOverlay = document.getElementById("resultOverlay");
+      var closeResultBtn = document.getElementById("closeResultBtn");
       var winnerNumber = document.getElementById("winnerNumber");
       var loserNumbers = document.getElementById("loserNumbers");
 
@@ -555,7 +643,7 @@
         raceBtn.disabled = true;
         raceBtn.textContent = "RACING…";
         readyText.style.display = "none";
-        result.classList.remove("show");
+        resultOverlay.classList.remove("show");
         countdown.classList.add("show");
         countdown.textContent = "10.0";
 
@@ -595,9 +683,9 @@
           var losers = [1, 2, 3, 4, 5].filter(function (n) { return n !== winner; });
           winnerNumber.textContent = String(winner);
           loserNumbers.textContent = losers.join(", ");
-          result.classList.add("show");
+          resultOverlay.classList.add("show");
+          closeResultBtn.focus();
 
-          raceBtn.disabled = false;
           raceBtn.textContent = "RACE AGAIN";
           running = false;
         }, RACE_MS + 120);
@@ -606,6 +694,16 @@
       }
 
       raceBtn.addEventListener("click", beginRace);
+
+      closeResultBtn.addEventListener("click", function () {
+        resultOverlay.classList.remove("show");
+        resetHorses();
+        readyText.style.display = "";
+        readyText.textContent = "Ready to race again";
+        raceBtn.disabled = false;
+        raceBtn.textContent = "RACE AGAIN";
+        raceBtn.focus();
+      });
 
       window.addEventListener("resize", function () {
         if (!running) {
